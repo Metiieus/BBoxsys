@@ -167,18 +167,18 @@ const QuickStatusChange = ({
     (option) => {
       if (!option.permission) return true;
       const [resource, action] = option.permission.split(":");
-      
+
       // Lógica para o vendedor: só pode "Enviar" se o pedido for dele
       if (action === "create" && user?.role !== "admin") {
         return order.seller_id === user?.id;
       }
-      
+
       // Lógica para o admin: só pode "Confirmar"
       if (action === "approve" && user?.role === "admin") {
         return true;
       }
-      
-      return false;
+
+      return checkPermission(resource, action);
     }
   );
 
