@@ -61,9 +61,7 @@ export default function Production() {
     const allOrders = await getOrders();
     // Filtrar apenas pedidos em produção
     const productionOrders = allOrders.filter(
-      (o) =>
-        o.status === "in_production" ||
-        o.status === "quality_check"
+      (o) => o.status === "in_production" || o.status === "quality_check",
     );
     setOrders(productionOrders);
   };
@@ -72,7 +70,7 @@ export default function Production() {
     return orders.filter((order) => {
       const stages = order.production_stages || [];
       const currentStage = stages.find((s) => s.stage === stageId);
-      
+
       // Mostrar pedidos que estão nesta etapa (pendente ou em andamento)
       return currentStage && currentStage.status !== "completed";
     });
@@ -81,13 +79,13 @@ export default function Production() {
   const getStageProgress = (stageId: string) => {
     const ordersInStage = getOrdersByStage(stageId);
     if (ordersInStage.length === 0) return 0;
-    
+
     const completed = ordersInStage.filter((order) => {
       const stages = order.production_stages || [];
       const stage = stages.find((s) => s.stage === stageId);
       return stage?.status === "completed";
     }).length;
-    
+
     return Math.round((completed / ordersInStage.length) * 100);
   };
 
@@ -108,18 +106,33 @@ export default function Production() {
       updatedStages.push({ stage: stageId, ...updates } as any);
     }
 
-    await updateOrder(selectedOrder.id, {
+    // Verificar se todas as etapas estão concluídas
+    const allStagesCompleted = productionStages.every((stage) => {
+      const stageData = updatedStages.find((s) => s.stage === stage.id);
+      return stageData && stageData.status === "completed";
+    });
+
+    const orderUpdates: any = {
       ...selectedOrder,
       production_stages: updatedStages,
-      status: "in_production" as Order["status"],
-    });
+      status: allStagesCompleted ? "ready" : "in_production",
+    };
+
+    // Se todas as etapas estão concluídas, adicionar data de conclusão
+    if (allStagesCompleted && !selectedOrder.completed_date) {
+      orderUpdates.completed_date = new Date().toISOString();
+    }
+
+    await updateOrder(selectedOrder.id, orderUpdates);
 
     // Recarregar pedidos
     await loadOrders();
-    
+
     // Atualizar pedido selecionado
     const refreshedOrders = await getOrders();
-    const refreshedOrder = refreshedOrders.find((o) => o.id === selectedOrder.id);
+    const refreshedOrder = refreshedOrders.find(
+      (o) => o.id === selectedOrder.id,
+    );
     if (refreshedOrder) {
       setSelectedOrder(refreshedOrder);
     }
@@ -162,9 +175,13 @@ export default function Production() {
             {productionStages.map((stage) => {
               const Icon = stageIcons[stage.id as keyof typeof stageIcons];
               const ordersCount = getOrdersByStage(stage.id).length;
-              
+
               return (
-                <TabsTrigger key={stage.id} value={stage.id} className="flex items-center gap-2">
+                <TabsTrigger
+                  key={stage.id}
+                  value={stage.id}
+                  className="flex items-center gap-2"
+                >
                   <Icon className="h-4 w-4" />
                   <span className="hidden md:inline">{stage.name}</span>
                   {ordersCount > 0 && (
@@ -183,7 +200,11 @@ export default function Production() {
             const progress = getStageProgress(stage.id);
 
             return (
-              <TabsContent key={stage.id} value={stage.id} className="space-y-4">
+              <TabsContent
+                key={stage.id}
+                value={stage.id}
+                className="space-y-4"
+              >
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -192,7 +213,9 @@ export default function Production() {
                           <Icon className="h-6 w-6 text-biobox-green" />
                         </div>
                         <div>
-                          <CardTitle className="text-xl">{stage.name}</CardTitle>
+                          <CardTitle className="text-xl">
+                            {stage.name}
+                          </CardTitle>
                           <p className="text-sm text-muted-foreground">
                             Tempo estimado: {stage.estimatedTime} min
                           </p>
@@ -208,7 +231,9 @@ export default function Production() {
                     {ordersInStage.length > 0 && (
                       <div className="mt-4">
                         <div className="flex items-center justify-between text-sm mb-2">
-                          <span className="text-muted-foreground">Progresso Geral</span>
+                          <span className="text-muted-foreground">
+                            Progresso Geral
+                          </span>
                           <span className="font-medium">{progress}%</span>
                         </div>
                         <Progress value={progress} />
@@ -227,108 +252,126 @@ export default function Production() {
                       <>
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                           {ordersInStage
-                            .slice((currentPages[stage.id] - 1) * ordersPerPage, currentPages[stage.id] * ordersPerPage)
+                            .slice(
+                              (currentPages[stage.id] - 1) * ordersPerPage,
+                              currentPages[stage.id] * ordersPerPage,
+                            )
                             .map((order) => {
-                          const status = getStageStatus(order, stage.id);
-                          const stageData = order.production_stages?.find(
-                            (s) => s.stage === stage.id
-                          );
+                              const status = getStageStatus(order, stage.id);
+                              const stageData = order.production_stages?.find(
+                                (s) => s.stage === stage.id,
+                              );
 
-                          return (
-                            <Card
-                              key={order.id}
-                              className="hover:shadow-md transition-shadow cursor-pointer"
-                              onClick={() => handleOpenStages(order)}
-                            >
-                              <CardHeader className="pb-3">
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <div
+                              return (
+                                <Card
+                                  key={order.id}
+                                  className="hover:shadow-md transition-shadow cursor-pointer"
+                                  onClick={() => handleOpenStages(order)}
+                                >
+                                  <CardHeader className="pb-3">
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <div
+                                            className={cn(
+                                              "w-2 h-2 rounded-full",
+                                              priorityColors[order.priority],
+                                            )}
+                                          />
+                                          <span className="font-semibold">
+                                            {order.order_number}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                          {order.customer_name}
+                                        </p>
+                                      </div>
+                                      <Badge
+                                        variant={
+                                          status === "completed"
+                                            ? "default"
+                                            : status === "in_progress"
+                                              ? "secondary"
+                                              : "outline"
+                                        }
                                         className={cn(
-                                          "w-2 h-2 rounded-full",
-                                          priorityColors[order.priority]
+                                          status === "completed" &&
+                                            "bg-green-500",
+                                          status === "in_progress" &&
+                                            "bg-blue-500",
                                         )}
-                                      />
-                                      <span className="font-semibold">
-                                        {order.order_number}
-                                      </span>
+                                      >
+                                        {status === "pending" && "Pendente"}
+                                        {status === "in_progress" &&
+                                          "Em Andamento"}
+                                        {status === "completed" && "Concluído"}
+                                      </Badge>
                                     </div>
-                                    <p className="text-sm text-muted-foreground">
-                                      {order.customer_name}
-                                    </p>
-                                  </div>
-                                  <Badge
-                                    variant={
-                                      status === "completed"
-                                        ? "default"
-                                        : status === "in_progress"
-                                        ? "secondary"
-                                        : "outline"
-                                    }
-                                    className={cn(
-                                      status === "completed" && "bg-green-500",
-                                      status === "in_progress" && "bg-blue-500"
+                                  </CardHeader>
+                                  <CardContent className="space-y-2">
+                                    {stageData?.assigned_operator && (
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <User className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">
+                                          {stageData.assigned_operator}
+                                        </span>
+                                      </div>
                                     )}
-                                  >
-                                    {status === "pending" && "Pendente"}
-                                    {status === "in_progress" && "Em Andamento"}
-                                    {status === "completed" && "Concluído"}
-                                  </Badge>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="space-y-2">
-                                {stageData?.assigned_operator && (
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <User className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">
-                                      {stageData.assigned_operator}
-                                    </span>
-                                  </div>
-                                )}
-                                {stageData?.started_at && (
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">
-                                      Iniciado:{" "}
-                                      {format(
-                                        new Date(stageData.started_at),
-                                        "dd/MM HH:mm",
-                                        { locale: ptBR }
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-                                {order.scheduled_date && (
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">
-                                      Produção:{" "}
-                                      {format(
-                                        new Date(order.scheduled_date),
-                                        "dd/MM/yyyy",
-                                        { locale: ptBR }
-                                      )}
-                                    </span>
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          );
-                          })}
+                                    {stageData?.started_at && (
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">
+                                          Iniciado:{" "}
+                                          {format(
+                                            new Date(stageData.started_at),
+                                            "dd/MM HH:mm",
+                                            { locale: ptBR },
+                                          )}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {order.scheduled_date && (
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">
+                                          Produção:{" "}
+                                          {format(
+                                            new Date(order.scheduled_date),
+                                            "dd/MM/yyyy",
+                                            { locale: ptBR },
+                                          )}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
                         </div>
-                        
+
                         {/* Paginação */}
                         {ordersInStage.length > ordersPerPage && (
                           <div className="flex items-center justify-between mt-6 pt-4 border-t">
                             <p className="text-sm text-muted-foreground">
-                              Mostrando {((currentPages[stage.id] - 1) * ordersPerPage) + 1} a {Math.min(currentPages[stage.id] * ordersPerPage, ordersInStage.length)} de {ordersInStage.length} pedidos
+                              Mostrando{" "}
+                              {(currentPages[stage.id] - 1) * ordersPerPage + 1}{" "}
+                              a{" "}
+                              {Math.min(
+                                currentPages[stage.id] * ordersPerPage,
+                                ordersInStage.length,
+                              )}{" "}
+                              de {ordersInStage.length} pedidos
                             </p>
                             <div className="flex gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setCurrentPages(prev => ({ ...prev, [stage.id]: Math.max(1, prev[stage.id] - 1) }))}
+                                onClick={() =>
+                                  setCurrentPages((prev) => ({
+                                    ...prev,
+                                    [stage.id]: Math.max(1, prev[stage.id] - 1),
+                                  }))
+                                }
                                 disabled={currentPages[stage.id] === 1}
                               >
                                 Anterior
@@ -336,8 +379,23 @@ export default function Production() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setCurrentPages(prev => ({ ...prev, [stage.id]: Math.min(Math.ceil(ordersInStage.length / ordersPerPage), prev[stage.id] + 1) }))}
-                                disabled={currentPages[stage.id] >= Math.ceil(ordersInStage.length / ordersPerPage)}
+                                onClick={() =>
+                                  setCurrentPages((prev) => ({
+                                    ...prev,
+                                    [stage.id]: Math.min(
+                                      Math.ceil(
+                                        ordersInStage.length / ordersPerPage,
+                                      ),
+                                      prev[stage.id] + 1,
+                                    ),
+                                  }))
+                                }
+                                disabled={
+                                  currentPages[stage.id] >=
+                                  Math.ceil(
+                                    ordersInStage.length / ordersPerPage,
+                                  )
+                                }
                               >
                                 Próxima
                               </Button>
@@ -381,4 +439,3 @@ export default function Production() {
     </DashboardLayout>
   );
 }
-

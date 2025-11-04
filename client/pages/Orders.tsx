@@ -132,12 +132,27 @@ const QuickStatusChange = ({
 
   const nextStatuses = {
     pending: [
-      { status: "confirmed", label: "Confirmar", color: "bg-blue-500", permission: "orders:approve" },
-      { status: "awaiting_approval", label: "Enviar", color: "bg-blue-500", permission: "orders:create" },
+      {
+        status: "confirmed",
+        label: "Confirmar",
+        color: "bg-blue-500",
+        permission: "orders:approve",
+      },
+      {
+        status: "awaiting_approval",
+        label: "Enviar",
+        color: "bg-blue-500",
+        permission: "orders:create",
+      },
       { status: "cancelled", label: "Cancelar", color: "bg-red-500" },
     ],
     awaiting_approval: [
-      { status: "confirmed", label: "Confirmar", color: "bg-blue-500", permission: "orders:approve" },
+      {
+        status: "confirmed",
+        label: "Confirmar",
+        color: "bg-blue-500",
+        permission: "orders:approve",
+      },
       { status: "cancelled", label: "Cancelar", color: "bg-red-500" },
     ],
     confirmed: [
@@ -163,24 +178,24 @@ const QuickStatusChange = ({
     return null;
   }
 
-  const options = (nextStatuses[order.status as keyof typeof nextStatuses] || []).filter(
-    (option) => {
-      if (!option.permission) return true;
-      const [resource, action] = option.permission.split(":");
-      
-      // Lógica para o vendedor: só pode "Enviar" se o pedido for dele
-      if (action === "create" && user?.role !== "admin") {
-        return order.seller_id === user?.id;
-      }
-      
-      // Lógica para o admin: só pode "Confirmar"
-      if (action === "approve" && user?.role === "admin") {
-        return true;
-      }
-      
-      return false;
+  const options = (
+    nextStatuses[order.status as keyof typeof nextStatuses] || []
+  ).filter((option) => {
+    if (!option.permission) return true;
+    const [resource, action] = option.permission.split(":");
+
+    // Lógica para o vendedor: só pode "Enviar" se o pedido for dele
+    if (action === "create" && user?.role !== "admin") {
+      return order.seller_id === user?.id;
     }
-  );
+
+    // Lógica para o admin: só pode "Confirmar"
+    if (action === "approve" && user?.role === "admin") {
+      return true;
+    }
+
+    return checkPermission(resource, action);
+  });
 
   if (options.length === 0) return null;
 
@@ -335,9 +350,9 @@ export default function Orders() {
         fragment.id || `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
       return {
         id: fragmentId,
-      order_id: orderId,
-      product_id: fragment.productId, // Adicionado
-      fragment_number: fragmentNumber,
+        order_id: orderId,
+        product_id: fragment.productId, // Adicionado
+        fragment_number: fragmentNumber,
         quantity: toNumber(fragment.quantity),
         scheduled_date: fragment.scheduledDate.toISOString(),
         status: fragment.status,
@@ -376,7 +391,7 @@ export default function Orders() {
   const openFragmentForm = (order: Order) => {
     setFragmentTarget(order);
     // Não mapear fragments aqui, o formulário vai lidar com isso por produto
-    setFragmentInitial([]); 
+    setFragmentInitial([]);
     setShowFragmentForm(true);
   };
 
@@ -388,7 +403,7 @@ export default function Orders() {
 
   const handleSaveFragments = async (fragments: UiOrderFragment[]) => {
     if (!fragmentTarget) return;
-    
+
     // A lógica de totalização será mais complexa, mas por enquanto, apenas salvamos todos os fragmentos
     const payload = mapFragmentsToDb(fragmentTarget.id, fragments);
 
@@ -396,7 +411,7 @@ export default function Orders() {
       const updated = await updateOrder(fragmentTarget.id, {
         fragments: payload as any,
         is_fragmented: fragments.length > 0,
-        // total_quantity e total_amount não são mais atualizados aqui, 
+        // total_quantity e total_amount não são mais atualizados aqui,
         // pois a fragmentação é por produto e não total do pedido
       });
       if (updated) {
@@ -425,13 +440,13 @@ export default function Orders() {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const load = async () => {
       try {
         setLoading(true);
         console.log("🔍 Buscando pedidos...", { isConnected });
         const ordersData = await getOrders();
-        
+
         if (isMounted) {
           console.log("✅ Pedidos carregados:", ordersData.length);
           setOrders(ordersData);
@@ -446,9 +461,9 @@ export default function Orders() {
         }
       }
     };
-    
+
     load();
-    
+
     const handleOrdersChanged = () => {
       if (isMounted) {
         loadOrders();
@@ -714,16 +729,20 @@ export default function Orders() {
     if (nextStatus === "delivered") {
       (updates as any).completed_date = new Date().toISOString();
     }
-    
+
     // Ao iniciar produção, iniciar automaticamente a primeira etapa (Corte e Costura)
     if (nextStatus === "in_production") {
       const productionStages = order.production_stages || [];
-      const firstStage = productionStages.find(s => s.stage === "cutting_sewing");
-      
+      const firstStage = productionStages.find(
+        (s) => s.stage === "cutting_sewing",
+      );
+
       if (!firstStage || firstStage.status === "pending") {
         const updatedStages = [...productionStages];
-        const stageIndex = updatedStages.findIndex(s => s.stage === "cutting_sewing");
-        
+        const stageIndex = updatedStages.findIndex(
+          (s) => s.stage === "cutting_sewing",
+        );
+
         if (stageIndex >= 0) {
           updatedStages[stageIndex] = {
             ...updatedStages[stageIndex],
@@ -737,19 +756,20 @@ export default function Orders() {
             started_at: new Date().toISOString(),
           });
         }
-        
+
         (updates as any).production_stages = updatedStages;
       }
     }
-    
+
     const updated = await updateOrder(order.id, updates);
     if (updated) {
       // applyUpdate(updated); // Removido, o listener orders:changed fará isso
       toast({
         title: "Status atualizado",
-        description: nextStatus === "in_production" 
-          ? `Pedido ${updated.order_number} iniciado na etapa de Corte e Costura`
-          : `Pedido ${updated.order_number} agora está em "${statusLabels[nextStatus]}"`,
+        description:
+          nextStatus === "in_production"
+            ? `Pedido ${updated.order_number} iniciado na etapa de Corte e Costura`
+            : `Pedido ${updated.order_number} agora está em "${statusLabels[nextStatus]}"`,
       });
       if (nextStatus === "in_production") {
         navigate(`/production?orderId=${updated.id}`);
@@ -1676,43 +1696,57 @@ export default function Orders() {
                   )}
 
                 {/* Etapas de Produção */}
-                {selectedOrder.status !== "pending" && selectedOrder.status !== "awaiting_approval" && selectedOrder.status !== "cancelled" && (
-                  <ProductionStagesTracker
-                    orderId={selectedOrder.id}
-                    orderNumber={selectedOrder.order_number}
-                    stages={selectedOrder.production_stages || []}
-                    onUpdateStage={async (stageId, updates) => {
-                      const updatedStages = [...(selectedOrder.production_stages || [])];
-                      const stageIndex = updatedStages.findIndex(s => s.stage === stageId);
-                      
-                      if (stageIndex >= 0) {
-                        updatedStages[stageIndex] = { ...updatedStages[stageIndex], ...updates };
-                      } else {
-                        updatedStages.push({ stage: stageId, ...updates } as any);
-                      }
-                      
-                      await updateOrder(selectedOrder.id, {
-                        ...selectedOrder,
-                        production_stages: updatedStages,
-                      });
-                      
-                      // Recarregar a lista de pedidos
-                      const updatedOrders = await getOrders();
-                      setOrders(updatedOrders);
-                      
-                      // Atualizar o pedido selecionado
-                      const refreshedOrder = updatedOrders.find(o => o.id === selectedOrder.id);
-                      if (refreshedOrder) {
-                        setSelectedOrder(refreshedOrder);
-                      }
-                    }}
-                    operators={[
-                      { id: "1", name: "João Silva" },
-                      { id: "2", name: "Maria Santos" },
-                      { id: "3", name: "Pedro Costa" },
-                    ]}
-                  />
-                )}
+                {selectedOrder.status !== "pending" &&
+                  selectedOrder.status !== "awaiting_approval" &&
+                  selectedOrder.status !== "cancelled" && (
+                    <ProductionStagesTracker
+                      orderId={selectedOrder.id}
+                      orderNumber={selectedOrder.order_number}
+                      stages={selectedOrder.production_stages || []}
+                      onUpdateStage={async (stageId, updates) => {
+                        const updatedStages = [
+                          ...(selectedOrder.production_stages || []),
+                        ];
+                        const stageIndex = updatedStages.findIndex(
+                          (s) => s.stage === stageId,
+                        );
+
+                        if (stageIndex >= 0) {
+                          updatedStages[stageIndex] = {
+                            ...updatedStages[stageIndex],
+                            ...updates,
+                          };
+                        } else {
+                          updatedStages.push({
+                            stage: stageId,
+                            ...updates,
+                          } as any);
+                        }
+
+                        await updateOrder(selectedOrder.id, {
+                          ...selectedOrder,
+                          production_stages: updatedStages,
+                        });
+
+                        // Recarregar a lista de pedidos
+                        const updatedOrders = await getOrders();
+                        setOrders(updatedOrders);
+
+                        // Atualizar o pedido selecionado
+                        const refreshedOrder = updatedOrders.find(
+                          (o) => o.id === selectedOrder.id,
+                        );
+                        if (refreshedOrder) {
+                          setSelectedOrder(refreshedOrder);
+                        }
+                      }}
+                      operators={[
+                        { id: "1", name: "João Silva" },
+                        { id: "2", name: "Maria Santos" },
+                        { id: "3", name: "Pedro Costa" },
+                      ]}
+                    />
+                  )}
 
                 {/* Observações */}
                 {selectedOrder.notes && (
@@ -1762,7 +1796,7 @@ export default function Orders() {
                         }}
                       >
                         <Scissors className="h-4 w-4 mr-2" />
-                        Fragmentar Produç  o
+                        Fragmentar Produç o
                       </Button>
                     )}
 
