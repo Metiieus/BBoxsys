@@ -108,15 +108,28 @@ export default function Production() {
       updatedStages.push({ stage: stageId, ...updates } as any);
     }
 
-    await updateOrder(selectedOrder.id, {
+    // Verificar se todas as etapas estão concluídas
+    const allStagesCompleted = productionStages.every(stage => {
+      const stageData = updatedStages.find(s => s.stage === stage.id);
+      return stageData && stageData.status === "completed";
+    });
+
+    const orderUpdates: any = {
       ...selectedOrder,
       production_stages: updatedStages,
-      status: "in_production" as Order["status"],
-    });
+      status: allStagesCompleted ? "ready" : "in_production",
+    };
+
+    // Se todas as etapas estão concluídas, adicionar data de conclusão
+    if (allStagesCompleted && !selectedOrder.completed_date) {
+      orderUpdates.completed_date = new Date().toISOString();
+    }
+
+    await updateOrder(selectedOrder.id, orderUpdates);
 
     // Recarregar pedidos
     await loadOrders();
-    
+
     // Atualizar pedido selecionado
     const refreshedOrders = await getOrders();
     const refreshedOrder = refreshedOrders.find((o) => o.id === selectedOrder.id);
@@ -381,4 +394,3 @@ export default function Production() {
     </DashboardLayout>
   );
 }
-
