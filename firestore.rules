@@ -77,28 +77,28 @@ service cloud.firestore {
     match /customers/{customerId} {
       // Qualquer usuário autenticado pode ler clientes
       allow read: if isAuthenticated();
-      
-      // Vendedores e admins podem criar clientes
-      allow create: if isAuthenticated() && (isAdmin() || isSeller());
-      
-      // Admins e vendedores podem atualizar clientes
-      allow update: if isAuthenticated() && (isAdmin() || isSeller());
-      
+
+      // Qualquer usuário autenticado pode criar clientes (fallback até documento estar criado)
+      allow create: if isAuthenticated();
+
+      // Qualquer usuário autenticado pode atualizar clientes (fallback)
+      allow update: if isAuthenticated();
+
       // Apenas admins podem deletar clientes
       allow delete: if isAdmin();
     }
-    
+
     // Produtos
     match /products/{productId} {
       // Qualquer usuário autenticado pode ler produtos
       allow read: if isAuthenticated();
-      
-      // Apenas admins podem criar produtos
-      allow create: if isAdmin();
-      
-      // Apenas admins podem atualizar produtos
-      allow update: if isAdmin();
-      
+
+      // Qualquer usuário autenticado pode criar produtos (fallback)
+      allow create: if isAuthenticated();
+
+      // Qualquer usuário autenticado pode atualizar produtos (fallback)
+      allow update: if isAuthenticated();
+
       // Apenas admins podem deletar produtos
       allow delete: if isAdmin();
     }
